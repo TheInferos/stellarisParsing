@@ -1,7 +1,6 @@
 'use strict'
 // Enables the reading of the file system.
 const fs = require('fs');
-const { ENGINE_METHOD_DSA } = require('constants');
 
 // These are the global values for the function, i will hard code them as these are not stored in the save values so if they change this will need changing.
 const PLAYABLE_FACTIONS = ['default'];
