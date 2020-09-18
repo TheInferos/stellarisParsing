@@ -1,21 +1,22 @@
 'use strict'
 // Enables the reading of the file system.
 const fs = require('fs');
+const { ENGINE_METHOD_DSA } = require('constants');
 
 // These are the global values for the function, i will hard code them as these are not stored in the save values so if they change this will need changing.
 const PLAYABLE_FACTIONS = ['default'];
 const FACTION_TRACKING = ["fallen_empire"].concat(PLAYABLE_FACTIONS);
 const BASE_MARKET_VALUES = {
-    mineral: { cost: 1, id: 2 },
+    minerals: { cost: 1, id: 2 },
     food: { cost: 1, id: 3 },
     consumer_goods: { cost: 2, id: 10 },
     alloys: { cost: 4, id: 9 },
-    exotic_gas: { cost: 10, id: 12 },
-    rare_crystal: { cost: 10, id: 13 },
-    volatile_mote: { cost: 10, id: 11 },
-    dark_matter: { cost: 20, id: 16 },
+    exotic_gases: { cost: 10, id: 12 },
+    rare_crystals: { cost: 10, id: 13 },
+    volatile_motes: { cost: 10, id: 11 },
+    sr_dark_matter: { cost: 20, id: 16 },
     living_metal: { cost: 20, id: 17 }, // This is an assumed value
-    zro: { cost: 20, id: 15 }, // This is an assumed value
+    sr_zro: { cost: 20, id: 15 }, // This is an assumed value
     nanites : {cost:50, id: 18} // This is an assumed value
 };
 
@@ -25,8 +26,6 @@ const NON_FLEET_SECTIONS = [
     'CONSTRUCTION',
     'STATION',
     'SCIENCESHIP'
-
-
 ];
 
 
@@ -92,6 +91,8 @@ function getStockpiles(data) {
     return balanceByCountry;
 }
 
+
+//TODO: Add energy Credits
 /**
  * The aim of this function is to work out the total value of the items stored in a coutnries.
  * Stockpiles if every item was liquidated for the current market value.
@@ -112,6 +113,9 @@ function totalMarketableResources(data, mappings) {
         for (let resource in mappings.stockpiles[country]) {
             if (BASE_MARKET_VALUES[resource] != undefined) {
                 mappings.totalStockpileValue[country] += marketRate[resource] * mappings.stockpiles[country][resource];
+            }
+            else if(resource == 'energy'){
+                mappings.totalStockpileValue[country] +=mappings.stockpiles[country][resource];
             }
         }
     }
@@ -234,22 +238,65 @@ function totalArmyPower(data) {
 
 /** */
 function getMegastructures(data){
-    let megastructues = {};
-    for (structure in data.megastructues){
-        let temp = data.megastructues[structure];
-        if(!megastructues[temp.owner]){
-           megastructues[temp.owner] = {}; 
+    let megastructures = {};
+    for (let structure in data.megastructures){
+        let temp = data.megastructures[structure];
+        if(!megastructures[temp.owner]){
+           megastructures[temp.owner] = {}; 
         }
-        if(!megastructues[temp.owner][temp.type]){
-            megastructues[temp.owner][temp.type] = 1;
+        if(!megastructures[temp.owner][temp.type]){
+            megastructures[temp.owner][temp.type] = 1;
         }
         else{
-            megastructues[temp.owner][temp.type] += 1;
+            megastructures[temp.owner][temp.type] += 1;
         }
     }
-return ;
+return megastructures;
 }
 
+/** */
+function getPopStratums(data,mappings){
+    let popsPerSpecies ={};
+    let popHappiness = {};
+    let popJobLevels ={};
+    for (let pop in data.pop){
+        let tempPop = data.pop[pop];
+        if(popsPerSpecies[tempPop.species_index] == undefined){
+            popsPerSpecies[tempPop.species_index] = {};
+        }
+        if(popJobLevels[tempPop.category] == undefined){
+            popJobLevels[tempPop.category] = {}
+        }
+        popsPerSpecies[tempPop.species_index][pop] = tempPop;
+        popJobLevels[tempPop.category][pop] = tempPop;
+        if(tempPop.happiness != undefined){
+            if(popHappiness[tempPop.species_index] == undefined){
+                popHappiness[tempPop.species_index] = {count:0, happiness :0};
+            }
+            popHappiness[tempPop.species_index].count +=1
+            popHappiness[tempPop.species_index].happiness +=tempPop.happiness  
+        }
+    }
+    for (let species in popHappiness){
+        popHappiness[species].averageHappiness = popHappiness[species].happiness /popHappiness[species].count
+    }
+    mappings.popsPerSpecies = popsPerSpecies;
+    mappings.popHappiness = popHappiness;
+    for (let jobType in popJobLevels){
+        popJobLevels[jobType] = Object.keys(popJobLevels[jobType]).length
+    }
+    mappings.popJobLevels = popJobLevels;
+return mappings;
+}
+
+/** */
+function getCountryNames(data){
+  let countryList ={}
+    for ( let country in data.country){
+        countryList[country] = data.country[country].name
+  }
+return countryList;
+}
 
 
 
@@ -257,17 +304,20 @@ return ;
  * This will pass the file to get this file i have used a parse written by jomini. 
  */
 function parseFile() {
-    //var jomini = require('jomini');
-    //let data = jomini.parse(str);
+     var jomini = require('jomini');
+     var str = fs.readFileSync('saves/autosave_2435.07.01/gamestate','utf8');//'savedata.txt', 'utf8');
+     let data = jomini.parse(str);
     //var str = parseSplitJSON();
-    var str = fs.readFileSync('jomini-master/jomini-master/savedata.txt','utf8');//'savedata.txt', 'utf8');
-    return JSON.parse(str);
+    //var str = fs.readFileSync('jomini-master/jomini-master/savedata.txt','utf8');//'savedata.txt', 'utf8');
+    //let data = JSON.parse(str)
+    return data;
 }
 
 
 function main() {
     let jn = parseFile();
-    let mappings = {};
+    let mappings ={}
+    mappings.country = getCountryNames(jn)
     mappings.income = getIncomes(jn);
     mappings.stockpiles = getStockpiles(jn);
     mappings = totalMarketableResources(jn, mappings);
@@ -275,7 +325,12 @@ function main() {
     mappings.totalFleetPower = totalFleetPower(mappings);
     mappings.totalArmyPower = totalArmyPower(mappings);
     mappings.megastructures = getMegastructures(jn);
-    saveFile('output.txt', JSON.stringify(mappings));
+    mappings= getPopStratums(jn,mappings)
+    delete mappings.popsPerSpecies;
+    delete mappings.fleetByPlayer;
+    delete mappings.armyByPlayer;
+    saveFile('output2.json', JSON.stringify(mappings));
+    saveFile('save.json', JSON.stringify(jn))
     return mappings;
 }
 
