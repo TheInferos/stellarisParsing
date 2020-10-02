@@ -16,7 +16,7 @@ const BASE_MARKET_VALUES = {
     sr_dark_matter: { cost: 20, id: 16 },
     living_metal: { cost: 20, id: 17 }, // This is an assumed value
     sr_zro: { cost: 20, id: 15 }, // This is an assumed value
-    nanites : {cost:50, id: 18} // This is an assumed value
+    nanites: { cost: 50, id: 18 } // This is an assumed value
 };
 
 // This is a list of sections of ships which indicate that they are not military ships.
@@ -55,8 +55,8 @@ function getIncomes(data) {
             if (FACTION_TRACKING.indexOf(data.country[country].type) != -1) {
                 incomeByCountry[country] = {};
                 let countryIncome = data.country[country].budget.last_month.income;
-                for (income in countryIncome) {
-                    for (resource in countryIncome[income]) {
+                for (let income in countryIncome) {
+                    for (let resource in countryIncome[income]) {
                         if (incomeByCountry[country][resource] == undefined) {
                             incomeByCountry[country][resource] = 0;
                         }
@@ -104,7 +104,10 @@ function totalMarketableResources(data, mappings) {
     mappings.totalIncomeValue = {};
 
     for (let resource in BASE_MARKET_VALUES) {
-        let flux = data.market.fluctuations[BASE_MARKET_VALUES[resource].id];
+        let flux = 1
+        if(data.market.fluctuations!== undefined){
+            flux = data.market.fluctuations[BASE_MARKET_VALUES[resource].id];
+        } 
         marketRate[resource] = BASE_MARKET_VALUES[resource].cost * ((100 + flux) / 100);
     }
     for (let country in mappings.stockpiles) {
@@ -113,8 +116,8 @@ function totalMarketableResources(data, mappings) {
             if (BASE_MARKET_VALUES[resource] != undefined) {
                 mappings.totalStockpileValue[country] += marketRate[resource] * mappings.stockpiles[country][resource];
             }
-            else if(resource == 'energy'){
-                mappings.totalStockpileValue[country] +=mappings.stockpiles[country][resource];
+            else if (resource == 'energy') {
+                mappings.totalStockpileValue[country] += mappings.stockpiles[country][resource];
             }
         }
     }
@@ -176,7 +179,7 @@ function totalFleets(data, mapping) {
                 }
                 else {
                     shipsByPlayer[tempFleet.owner][tempFleet.ships[ship]] = tempShip;
-                    fleetByPlayer[tempFleet.owner][fleet] = tempFleet; 
+                    fleetByPlayer[tempFleet.owner][fleet] = tempFleet;
                 }
             }
         }
@@ -185,7 +188,7 @@ function totalFleets(data, mapping) {
     mapping.shipsByPlayer = shipsByPlayer;
     mapping.armiesByPlayer = armiesByPlayer;
     mapping.armyFleetsByPlayer = armyFleetsByPlayer;
-    saveFile('Output.json', JSON.stringify(mapping))
+    //saveFile('Output.json', JSON.stringify(mapping))
     return mapping;
 }
 
@@ -212,7 +215,7 @@ function totalFleetPower(data) {
     let output = {};
     for (let country in data.fleetByPlayer) {
         output[country] = 0;
-        for(let ship in data.fleetByPlayer[country]){
+        for (let ship in data.fleetByPlayer[country]) {
             output[country] += data.fleetByPlayer[country][ship].military_power;
         }
     }
@@ -227,7 +230,7 @@ function totalArmyPower(data) {
     let output = {};
     for (let country in data.armyFleetsByPlayer) {
         output[country] = 0;
-        for(let ship in data.armyFleetsByPlayer[country]){
+        for (let ship in data.armyFleetsByPlayer[country]) {
             output[country] += data.armyFleetsByPlayer[country][ship].military_power;
         }
     }
@@ -236,66 +239,131 @@ function totalArmyPower(data) {
 
 
 /** */
-function getMegastructures(data){
+function getMegastructures(data) {
     let megastructures = {};
-    for (let structure in data.megastructures){
+    for (let structure in data.megastructures) {
         let temp = data.megastructures[structure];
-        if(!megastructures[temp.owner]){
-           megastructures[temp.owner] = {}; 
+        if (!megastructures[temp.owner]) {
+            megastructures[temp.owner] = {};
         }
-        if(!megastructures[temp.owner][temp.type]){
+        if (!megastructures[temp.owner][temp.type]) {
             megastructures[temp.owner][temp.type] = 1;
         }
-        else{
+        else {
             megastructures[temp.owner][temp.type] += 1;
         }
     }
-return megastructures;
+    return megastructures;
 }
 
 /** */
-function getPopStratums(data,mappings){
-    let popsPerSpecies ={};
+function getPopData(data, mappings) {
+    let popCount = {};
+    let popsPerSpecies = {};
     let popHappiness = {};
-    let popJobLevels ={};
-    for (let pop in data.pop){
+    let popJobLevels = {};
+    let popJobs = {}
+    let popEthos = {};
+    for (let pop in data.pop) {
         let tempPop = data.pop[pop];
-        if(popsPerSpecies[tempPop.species_index] == undefined){
+        if (popsPerSpecies[tempPop.species_index] == undefined) {
             popsPerSpecies[tempPop.species_index] = {};
         }
-        if(popJobLevels[tempPop.category] == undefined){
+        popsPerSpecies[tempPop.species_index][pop] = tempPop;
+        if (popJobs[tempPop.job] == undefined) {
+            popJobs[tempPop.job] = 0
+        }
+        popJobs[tempPop.job] += 1;
+        if (popJobLevels[tempPop.category] == undefined) {
             popJobLevels[tempPop.category] = {}
         }
-        popsPerSpecies[tempPop.species_index][pop] = tempPop;
         popJobLevels[tempPop.category][pop] = tempPop;
-        if(tempPop.happiness != undefined){
-            if(popHappiness[tempPop.species_index] == undefined){
-                popHappiness[tempPop.species_index] = {count:0, happiness :0};
+        if (tempPop.happiness != undefined) {
+            if (popHappiness[tempPop.species_index] == undefined) {
+                popHappiness[tempPop.species_index] = { count: 0, happiness: 0 };
             }
-            popHappiness[tempPop.species_index].count +=1
-            popHappiness[tempPop.species_index].happiness +=tempPop.happiness  
+            popHappiness[tempPop.species_index].count += 1
+            popHappiness[tempPop.species_index].happiness += tempPop.happiness
+        }
+        if (popCount[data.species[tempPop.species_index].name] === undefined) {
+            popCount[data.species[tempPop.species_index].name] = 0;
+        }
+        popCount[data.species[tempPop.species_index].name] += 1;
+        if (tempPop.ethos != undefined) {
+            if (popEthos[tempPop.ethos.ethic.split('ethic_')[1]] === undefined) {
+                popEthos[tempPop.ethos.ethic.split('ethic_')[1]] = 0;
+            }
+            popEthos[tempPop.ethos.ethic.split('ethic_')[1]] += 1;
+        }
+        else {
+            if(popEthos[data.species[tempPop.species_index].class] === undefined ){
+                popEthos[data.species[tempPop.species_index].class] = 0
+            }
+            popEthos[data.species[tempPop.species_index].class] +=1;
         }
     }
-    for (let species in popHappiness){
-        popHappiness[species].averageHappiness = popHappiness[species].happiness /popHappiness[species].count
+    for (let species in popHappiness) {
+        popHappiness[species].averageHappiness = popHappiness[species].happiness / popHappiness[species].count
     }
     mappings.popsPerSpecies = popsPerSpecies;
     mappings.popHappiness = popHappiness;
-    for (let jobType in popJobLevels){
+    for (let jobType in popJobLevels) {
         popJobLevels[jobType] = Object.keys(popJobLevels[jobType]).length
     }
     mappings.popJobLevels = popJobLevels;
-return mappings;
+    mappings.popsCount = popCount;
+    mappings.popEthos = popEthos;
+    mappings.popJobs = popJobs;
+    return mappings;
 }
 
 /** */
-function getCountryNames(data){
-  let countryList ={}
-    for ( let country in data.country){
+function getCountryNames(data) {
+    let countryList = {}
+    for (let country in data.country) {
         countryList[country] = data.country[country].name
-  }
-return countryList;
+    }
+    return countryList;
 }
+
+
+/** */
+function mapPlanets(jn, mappings) {
+    mappings.planetsByOwner = {};
+    mappings.playersByCrime = {};
+    mappings.districts = {}
+    for (let planet in jn.planets.planet) {
+        if (jn.planets.planet[planet].num_sapient_pops != 0) {
+            let temp = jn.planets.planet[planet]
+            if (mappings.planetsByOwner[temp.owner] === undefined) {
+                mappings.planetsByOwner[temp.owner] = [];
+            }
+            mappings.planetsByOwner[temp.owner].push(temp);
+            for (let district in temp.district) {
+                if (temp.district[district].length > 1) {
+                    if (mappings.districts[temp.district[district].split('_')[1]] === undefined) {
+                        mappings.districts[temp.district[district].split('_')[1]] = 0;
+                    }
+                    mappings.districts[temp.district[district].split('_')[1]] += 1;
+                }
+                if (mappings.playersByCrime[temp.controller] === undefined) {
+                    mappings.playersByCrime[temp.controller] = 0;
+                }
+                mappings.playersByCrime[temp.controller] += temp.crime;
+            }
+        }
+    }
+
+    return mappings;
+}
+
+
+/** */
+function mapPops(jn, mappings) {
+
+    return;
+}
+
 
 
 
@@ -303,11 +371,12 @@ return countryList;
  * This will pass the file to get this file i have used a parse written by jomini. 
  */
 function parseFile() {
-     var jomini = require('jomini');
-     var str = fs.readFileSync('saves/autosave_2435.07.01/gamestate','utf8');//'savedata.txt', 'utf8');
-     let data = jomini.parse(str);
+    var jomini = require('jomini');
+    var str = fs.readFileSync('saves/mprelicwardens/autosave_2229.07.01/gamestate', 'utf8');//'savedata.txt', 'utf8');
+    let data = jomini.parse(str);
+    // const str = fs.readFileSync('save.json', 'utf8')
+    // const data = JSON.parse(str)
     //var str = parseSplitJSON();
-    //var str = fs.readFileSync('jomini-master/jomini-master/savedata.txt','utf8');//'savedata.txt', 'utf8');
     //let data = JSON.parse(str)
     return data;
 }
@@ -315,7 +384,8 @@ function parseFile() {
 
 function main() {
     let jn = parseFile();
-    let mappings ={}
+    let mappings = {}
+    mappings = mapPlanets(jn, mappings);
     mappings.country = getCountryNames(jn)
     mappings.income = getIncomes(jn);
     mappings.stockpiles = getStockpiles(jn);
@@ -324,7 +394,7 @@ function main() {
     mappings.totalFleetPower = totalFleetPower(mappings);
     mappings.totalArmyPower = totalArmyPower(mappings);
     mappings.megastructures = getMegastructures(jn);
-    mappings= getPopStratums(jn,mappings)
+    mappings = getPopData(jn, mappings)
     delete mappings.popsPerSpecies;
     delete mappings.fleetByPlayer;
     delete mappings.armyByPlayer;
